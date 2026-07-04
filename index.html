@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Event Registration Lookup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  :root{
+    --bg:#F5F4EF;
+    --surface:#FFFFFF;
+    --primary:#1B4B43;
+    --primary-dark:#123430;
+    --primary-light:#3C8C7C;
+    --danger:#B54A3D;
+    --danger-bg:#FBEDE9;
+    --success-bg:#E9F3EE;
+    --warning:#C98A2E;
+    --text:#1F2620;
+    --text-muted:#5B6660;
+    --border:#DDD8CB;
+    --radius:14px;
+    --font-display:'Fraunces', serif;
+    --font-body:'Inter', sans-serif;
+    --font-mono:'IBM Plex Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:var(--font-body);
+    background:var(--bg);
+    color:var(--text);
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{max-width:960px;margin:0 auto;padding:28px 20px 80px;}
+
+  /* Header */
+  .topbar{
+    display:flex;
+    flex-wrap:wrap;
+    gap:20px;
+    justify-content:space-between;
+    align-items:flex-end;
+    margin-bottom:28px;
+  }
+  .brand{display:flex;gap:14px;align-items:center;}
+  .brand-mark{
+    width:44px;height:44px;flex-shrink:0;
+    border-radius:10px;
+    background:var(--primary);
+    color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-display);font-size:20px;font-weight:600;
+  }
+  h1{
+    font-family:var(--font-display);
+    font-size:26px;
+    font-weight:600;
+    margin:0 0 2px;
+    color:var(--primary-dark);
+  }
+  .tagline{margin:0;color:var(--text-muted);font-size:14px;}
+
+  .role-toggle{
+    display:flex;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:4px;
+    gap:2px;
+  }
+  .role-btn{
+    border:none;
+    background:transparent;
+    padding:10px 18px;
+    border-radius:999px;
+    font-family:var(--font-body);
+    font-weight:600;
+    font-size:14px;
+    color:var(--text-muted);
+    cursor:pointer;
+    transition:background .15s ease, color .15s ease;
+  }
+  .role-btn.active{background:var(--primary);color:#fff;}
+
+  .view{display:none;}
+  .view.active{display:block;}
+
+  /* Viewer */
+  .search-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:24px;
+    margin-bottom:20px;
+  }
+  .search-card label{
+    display:block;
+    font-weight:600;
+    font-size:15px;
+    margin-bottom:10px;
+  }
+  .search-card input{
+    width:100%;
+    padding:16px 18px;
+    font-size:18px;
+    border:2px solid var(--border);
+    border-radius:10px;
+    font-family:var(--font-body);
+    outline:none;
+    transition:border-color .15s ease;
+  }
+  .search-card input:focus{border-color:var(--primary-light);}
+  .hint{color:var(--text-muted);font-size:13px;margin-top:8px;}
+
+  .results{display:flex;flex-direction:column;gap:14px;}
+  .result-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-left:6px solid var(--primary-light);
+    border-radius:var(--radius);
+    padding:20px 22px;
+  }
+  .result-card.ineligible{border-left-color:var(--danger);}
+  .result-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .result-name{font-family:var(--font-display);font-size:20px;font-weight:600;margin:0;}
+  .badge{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:6px 14px;
+    border-radius:999px;
+    font-size:13px;
+    font-weight:700;
+    white-space:nowrap;
+  }
+  .badge.eligible{background:var(--success-bg);color:var(--primary-dark);}
+  .badge.ineligible{background:var(--danger-bg);color:var(--danger);}
+  .result-reason{margin:12px 0 0;font-size:15px;line-height:1.5;}
+  .result-meta{
+    margin-top:14px;
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(180px,1fr));
+    gap:10px 20px;
+    font-size:14px;
+    color:var(--text-muted);
+  }
+  .result-meta span{display:block;font-family:var(--font-mono);color:var(--text);}
+  .result-meta .label{font-family:var(--font-body);color:var(--text-muted);font-size:12px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px;}
+  .empty-state{
+    text-align:center;
+    padding:50px 20px;
+    color:var(--text-muted);
+  }
+  .empty-state .big{font-size:40px;margin-bottom:10px;}
+
+  .session-block{
+    margin-top:14px;
+    padding:12px 14px;
+    background:var(--bg);
+    border-radius:10px;
+    border:1px solid var(--border);
+  }
+  .session-block.unassigned{color:var(--text-muted);font-size:14px;}
+  .session-block .label{font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--text-muted);display:block;margin-bottom:4px;}
+  .session-block-name{font-family:var(--font-display);font-weight:600;font-size:16px;}
+  .session-block-sub{font-size:13px;color:var(--text-muted);margin-top:2px;}
+
+  /* Admin */
+  .stats-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(150px,1fr));
+    gap:12px;
+    margin-bottom:22px;
+  }
+  .stat-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:16px 18px;
+  }
+  .stat-card .num{font-family:var(--font-display);font-size:30px;font-weight:600;color:var(--primary-dark);}
+  .stat-card.danger .num{color:var(--danger);}
+  .stat-card .lbl{font-size:12.5px;color:var(--text-muted);margin-top:2px;}
+
+  .admin-controls{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    margin-bottom:16px;
+  }
+  .admin-controls input, .admin-controls select{
+    padding:10px 12px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    font-family:var(--font-body);
+    font-size:14px;
+  }
+  .admin-controls input{flex:1;min-width:180px;}
+  .btn{
+    padding:10px 16px;
+    border-radius:8px;
+    border:1px solid transparent;
+    font-family:var(--font-body);
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+  }
+  .btn.primary{background:var(--primary);color:#fff;}
+  .btn.secondary{background:var(--surface);border-color:var(--border);color:var(--text);}
+  .btn.ghost{background:transparent;color:var(--text-muted);border-color:transparent;text-decoration:underline;}
+  .btn.small{padding:6px 10px;font-size:13px;}
+  .btn.danger-outline{background:var(--surface);border-color:var(--danger);color:var(--danger);}
+
+  .table-wrap{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    overflow:hidden;
+  }
+  table{width:100%;border-collapse:collapse;font-size:14px;}
+  thead th{
+    text-align:left;
+    background:var(--bg);
+    padding:12px 14px;
+    font-size:12px;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+    color:var(--text-muted);
+    border-bottom:1px solid var(--border);
+  }
+  tbody td{padding:12px 14px;border-bottom:1px solid var(--border);vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:none;}
+  td.mono{font-family:var(--font-mono);font-size:13px;}
+  .status-pill{
+    display:inline-block;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700;
+  }
+  .status-pill.eligible{background:var(--success-bg);color:var(--primary-dark);}
+  .status-pill.ineligible{background:var(--danger-bg);color:var(--danger);}
+  .row-actions{display:flex;gap:6px;}
+
+  /* Modal */
+  .overlay{
+    display:none;
+    position:fixed;inset:0;
+    background:rgba(20,25,22,.45);
+    align-items:center;justify-content:center;
+    padding:20px;
+    z-index:50;
+  }
+  .overlay.active{display:flex;}
+  .modal{
+    background:var(--surface);
+    border-radius:var(--radius);
+    padding:26px;
+    width:100%;
+    max-width:480px;
+    max-height:90vh;
+    overflow-y:auto;
+  }
+  .modal h2{font-family:var(--font-display);margin:0 0 16px;font-size:20px;}
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;}
+  .field input, .field select, .field textarea{
+    width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:var(--font-body);font-size:14px;
+  }
+  .field textarea{resize:vertical;min-height:70px;}
+  .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+  .modal.wide{max-width:600px;}
+  .modal p.help{font-size:13px;color:var(--text-muted);margin-top:-8px;margin-bottom:14px;}
+
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:var(--primary-dark);color:#fff;
+    padding:12px 20px;border-radius:999px;font-size:14px;font-weight:600;
+    opacity:0;pointer-events:none;transition:opacity .2s ease;
+    z-index:60;
+  }
+  .toast.show{opacity:1;}
+
+  @media (max-width:640px){
+    .topbar{flex-direction:column;align-items:stretch;}
+    .role-toggle{justify-content:stretch;}
+    .role-btn{flex:1;}
+  }
+
+  /* Sessions */
+  .sessions-list{display:flex;flex-direction:column;gap:10px;margin-bottom:20px;}
+  .session-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:16px 18px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:14px;
+    flex-wrap:wrap;
+    cursor:pointer;
+  }
+  .session-card:hover{border-color:var(--primary-light);}
+  .session-card.selected{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary);}
+  .session-card .s-name{font-family:var(--font-display);font-size:17px;font-weight:600;}
+  .session-card .s-sub{font-size:13px;color:var(--text-muted);margin-top:2px;}
+  .fill-meter{
+    width:120px;height:8px;border-radius:99px;background:var(--border);overflow:hidden;flex-shrink:0;
+  }
+  .fill-meter-bar{height:100%;background:var(--primary-light);}
+  .fill-meter-bar.over{background:var(--danger);}
+  .fill-label{font-size:13px;font-weight:700;color:var(--text-muted);white-space:nowrap;}
+  .fill-label.over{color:var(--danger);}
+
+  .session-detail{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:22px;
+  }
+  .session-detail h2{font-family:var(--font-display);font-size:20px;margin:0 0 4px;}
+  .session-detail .s-criteria{font-size:13px;color:var(--text-muted);margin-bottom:16px;}
+  .detail-stats{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(120px,1fr));
+    gap:10px;
+    margin-bottom:18px;
+  }
+  .detail-stats .stat-card{padding:12px 14px;}
+  .detail-stats .num{font-size:22px;}
+  .detail-actions{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;}
+  .checkbox-group{display:flex;flex-wrap:wrap;gap:8px;}
+  .checkbox-chip{
+    display:inline-flex;align-items:center;gap:6px;
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:6px 12px;
+    font-size:13px;
+    cursor:pointer;
+    user-select:none;
+  }
+  .checkbox-chip input{margin:0;}
+  .checkbox-chip.checked{border-color:var(--primary);background:var(--success-bg);}
+  .candidate-table-wrap{max-height:420px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;}
+  .candidate-table-wrap table{font-size:13.5px;}
+  .candidate-table-wrap thead th{position:sticky;top:0;}
+  tr.candidate-row.checked td{background:var(--success-bg);}
+  .tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:999px;background:var(--bg);color:var(--text-muted);margin-left:6px;}
+  .tag.warn{background:#FBF0DE;color:var(--warning);}
+
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">E</div>
+      <div>
+        <h1>Event Registration Lookup</h1>
+        <p class="tagline">Check who's registered, who isn't, and why.</p>
+      </div>
+    </div>
+    <div class="role-toggle">
+      <button class="role-btn active" data-role="viewer">Check a caller</button>
+      <button class="role-btn" data-role="admin">Eligible list &amp; stats</button>
+      <button class="role-btn" data-role="ineligible">Ineligible (reference)</button>
+      <button class="role-btn" data-role="sessions">Sessions</button>
+    </div>
+  </header>
+
+  <!-- VIEWER VIEW -->
+  <section id="viewerView" class="view active">
+    <div class="search-card">
+      <label for="searchInput">Search by name, NRIC, address, zone, or contact number</label>
+      <input id="searchInput" type="text" placeholder="e.g. Tan Ah Kow, S1234567A, Block 123, Zone 4, 91234567" autocomplete="off" />
+      <p class="hint">Type at least 2 characters. Results update as you type.</p>
+    </div>
+    <div id="viewerResults" class="results"></div>
+  </section>
+
+  <!-- ADMIN VIEW -->
+  <section id="adminView" class="view">
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <p class="hint" style="margin:-6px 0 14px;">Showing eligible participants only. Ineligible entries are kept on the <button type="button" id="jumpToIneligible" style="border:none;background:none;color:var(--primary);font-weight:600;text-decoration:underline;cursor:pointer;padding:0;font-size:inherit;">Ineligible (reference)</button> tab.</p>
+    <div class="admin-controls">
+      <input id="adminSearch" type="text" placeholder="Filter the list by name, NRIC, address, zone or contact..." />
+      <button class="btn primary" id="addBtn">Add participant</button>
+      <button class="btn secondary" id="importBtn">Import CSV</button>
+      <button class="btn ghost" id="sampleBtn">Load sample data</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th><th>NRIC</th><th>Zone</th><th>Contact</th><th>Mobility</th><th>Session</th><th>Status</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- INELIGIBLE (REFERENCE) VIEW -->
+  <section id="ineligibleView" class="view">
+    <p class="hint" style="margin:0 0 14px;">Kept for reference only — these participants are hidden from the main eligible list but not deleted.</p>
+    <div class="admin-controls">
+      <input id="ineligibleSearch" type="text" placeholder="Filter by name, NRIC, address, zone or contact..." />
+      <select id="ineligibleReasonFilter">
+        <option value="">All reasons</option>
+        <option value="Age">Below age limit</option>
+        <option value="Non-Singaporean">Not a Singapore Citizen</option>
+        <option value="Outside Constituency">Outside constituency / zone</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th><th>NRIC</th><th>Zone</th><th>Contact</th><th>Mobility</th><th>Reason</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="ineligibleTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- SESSIONS VIEW -->
+  <section id="sessionsView" class="view">
+    <p class="hint" style="margin:0 0 14px;">Split eligible participants into sessions based on venue capacity and criteria like zone or mobility. Auto-suggest fills slots for you — you can still tick, untick, or add anyone manually before saving.</p>
+
+    <div class="admin-controls">
+      <button class="btn primary" id="newSessionBtn">New session</button>
+    </div>
+
+    <div id="sessionsList" class="sessions-list"></div>
+
+    <div id="sessionDetail" class="session-detail" style="display:none;"></div>
+  </section>
+
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="overlay" id="editOverlay">
+  <div class="modal">
+    <h2 id="editModalTitle">Add participant</h2>
+    <form id="editForm">
+      <input type="hidden" id="editId" />
+      <div class="field"><label for="f_name">Name</label><input id="f_name" required /></div>
+      <div class="field"><label for="f_nric">NRIC</label><input id="f_nric" required /></div>
+      <div class="field"><label for="f_address">Address</label><input id="f_address" /></div>
+      <div class="field"><label for="f_zone">Zone / Constituency</label><input id="f_zone" /></div>
+      <div class="field"><label for="f_contact">Contact number</label><input id="f_contact" /></div>
+      <div class="field"><label for="f_mobility">Mobility status</label>
+        <select id="f_mobility">
+          <option value="Mobile">Mobile</option>
+          <option value="Wheelchair/PMD">Wheelchair / PMD</option>
+          <option value="Walking Stick/Other">Walking stick / other aid</option>
+          <option value="Bedridden">Bedridden</option>
+        </select>
+      </div>
+      <div class="field"><label for="f_status">Eligibility status</label>
+        <select id="f_status">
+          <option value="Eligible">Eligible</option>
+          <option value="Ineligible">Ineligible</option>
+        </select>
+      </div>
+      <div class="field" id="reasonField" style="display:none;">
+        <label for="f_reason">Reason for ineligibility</label>
+        <select id="f_reason">
+          <option value="Age">Below minimum age</option>
+          <option value="Non-Singaporean">Not a Singapore Citizen</option>
+          <option value="Outside Constituency">Outside the constituency / zone</option>
+          <option value="Other">Other (specify in notes)</option>
+        </select>
+      </div>
+      <div class="field"><label for="f_notes">Notes (optional, visible to admins only)</label><textarea id="f_notes"></textarea></div>
+      <div class="modal-actions">
+        <button type="button" class="btn secondary" id="cancelEdit">Cancel</button>
+        <button type="button" class="btn danger-outline" id="deleteEntry" style="display:none;">Delete</button>
+        <button type="submit" class="btn primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Import Modal -->
+<div class="overlay" id="importOverlay">
+  <div class="modal wide">
+    <h2>Import from CSV</h2>
+    <p class="help">Paste CSV with headers: Name, NRIC, Address, Zone, Contact, Mobility, Status, Reason, Notes. Mobility should be one of Mobile, Wheelchair/PMD, Walking Stick/Other, Bedridden. Status must be "Eligible" or "Ineligible".</p>
+    <div class="field"><textarea id="csvInput" style="min-height:160px;font-family:var(--font-mono);font-size:12.5px;" placeholder="Name,NRIC,Address,Zone,Contact,Mobility,Status,Reason,Notes"></textarea></div>
+    <div class="modal-actions">
+      <button type="button" class="btn secondary" id="cancelImport">Cancel</button>
+      <button type="button" class="btn secondary" id="importAdd">Add to list</button>
+      <button type="button" class="btn primary" id="importReplace">Replace whole list</button>
+    </div>
+  </div>
+</div>
+
+<!-- Session Modal -->
+<div class="overlay" id="sessionOverlay">
+  <div class="modal">
+    <h2 id="sessionModalTitle">New session</h2>
+    <form id="sessionForm">
+      <input type="hidden" id="s_id" />
+      <div class="field"><label for="s_name">Session name</label><input id="s_name" required placeholder="e.g. Morning Session, 5 Jul" /></div>
+      <div class="field"><label for="s_datetime">Date &amp; time</label><input id="s_datetime" placeholder="e.g. 5 Jul 2026, 9:00am" /></div>
+      <div class="field"><label for="s_venue">Venue</label><input id="s_venue" placeholder="e.g. Community Club Hall, Level 2" /></div>
+      <div class="field"><label for="s_capacity">Venue capacity (number of seats)</label><input id="s_capacity" type="number" min="1" required /></div>
+      <div class="field"><label>Suggest from zones</label><div id="s_zones" class="checkbox-group"></div></div>
+      <div class="field"><label>Suggest from mobility status</label><div id="s_mobility" class="checkbox-group"></div></div>
+      <div class="modal-actions">
+        <button type="button" class="btn secondary" id="cancelSession">Cancel</button>
+        <button type="button" class="btn danger-outline" id="deleteSession" style="display:none;">Delete session</button>
+        <button type="submit" class="btn primary">Save session</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'participants';
+  const SESSIONS_KEY = 'sessions';
+  let participants = [];
+  let sessions = [];
+  let selectedSessionId = null;
+  let pendingChecked = {};
+
+  const mobilityLabels = {'Mobile':'Mobile','Wheelchair/PMD':'Wheelchair / PMD','Walking Stick/Other':'Walking stick / other aid','Bedridden':'Bedridden'};
+  const mobilityOptions = ['Mobile','Wheelchair/PMD','Walking Stick/Other','Bedridden'];
+
+  const reasonText = {
+    'Age': 'Not eligible — this event is only open to seniors above the minimum age.',
+    'Non-Singaporean': 'Not eligible — this event is only open to Singapore Citizens.',
+    'Outside Constituency': 'Not eligible — this event is only open to residents within the constituency/zone.',
+    'Other': null // falls back to notes
+  };
+  const reasonLabels = {Age:'Below age limit', 'Non-Singaporean':'Not a Singapore Citizen', 'Outside Constituency':'Outside constituency / zone', Other:'Other'};
+
+  function toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(()=>t.classList.remove('show'), 2200);
+  }
+
+  function uid(){ return 'p_' + Math.random().toString(36).slice(2,10); }
+
+  function sampleData(){
+    return [
+      {id:uid(), name:'Tan Ah Kow', nric:'S1234567A', address:'Blk 123 Ang Mo Kio Ave 3, #05-123', zone:'Zone 4', contact:'91234567', mobility:'Mobile', status:'Eligible', reason:'', notes:'', sessionId:''},
+      {id:uid(), name:'Mary Lim', nric:'S2345678B', address:'Blk 456 Toa Payoh Lorong 6, #10-45', zone:'Zone 2', contact:'92345678', mobility:'Wheelchair/PMD', status:'Ineligible', reason:'Age', notes:'', sessionId:''},
+      {id:uid(), name:'Rajesh Kumar', nric:'S3456789C', address:'Blk 789 Bedok North Ave 2, #03-21', zone:'Zone 1', contact:'93456789', mobility:'Mobile', status:'Ineligible', reason:'Outside Constituency', notes:'', sessionId:''},
+      {id:uid(), name:'Siti Aishah', nric:'S4567890D', address:'Blk 12 Clementi West St 1, #08-88', zone:'Zone 3', contact:'94567890', mobility:'Walking Stick/Other', status:'Eligible', reason:'', notes:'', sessionId:''},
+      {id:uid(), name:'John Wong', nric:'S5678901E', address:'Blk 34 Yishun Ring Rd, #12-14', zone:'Zone 5', contact:'95678901', mobility:'Mobile', status:'Ineligible', reason:'Non-Singaporean', notes:'', sessionId:''},
+      {id:uid(), name:'Bala Krishnan', nric:'S6789012F', address:'Blk 55 Hougang Ave 8, #02-09', zone:'Zone 4', contact:'96789012', mobility:'Wheelchair/PMD', status:'Ineligible', reason:'Age', notes:'', sessionId:''},
+      {id:uid(), name:'Grace Ong', nric:'S7890123G', address:'Blk 88 Ang Mo Kio Ave 6, #07-77', zone:'Zone 4', contact:'97890123', mobility:'Mobile', status:'Eligible', reason:'', notes:'', sessionId:''},
+      {id:uid(), name:'Ahmad Zulkifli', nric:'S8901234H', address:'Blk 21 Hougang Ave 3, #04-15', zone:'Zone 1', contact:'98901234', mobility:'Wheelchair/PMD', status:'Eligible', reason:'', notes:'', sessionId:''},
+      {id:uid(), name:'Lily Teo', nric:'S9012345I', address:'Blk 66 Toa Payoh Lorong 2, #09-33', zone:'Zone 2', contact:'99012345', mobility:'Mobile', status:'Eligible', reason:'', notes:'', sessionId:''}
+    ];
+  }
+
+  async function loadParticipants(){
+    try{
+      const res = await window.storage.get(STORAGE_KEY, true);
+      participants = res && res.value ? JSON.parse(res.value) : [];
+    }catch(e){
+      participants = [];
+    }
+    if(participants.length === 0){
+      participants = sampleData();
+      await saveParticipants(false);
+    }
+  }
+
+  async function saveParticipants(showToast=true){
+    try{
+      await window.storage.set(STORAGE_KEY, JSON.stringify(participants), true);
+      if(showToast) toast('Saved');
+    }catch(e){
+      toast('Could not save — please try again');
+    }
+  }
+
+  async function loadSessions(){
+    try{
+      const res = await window.storage.get(SESSIONS_KEY, true);
+      sessions = res && res.value ? JSON.parse(res.value) : [];
+    }catch(e){
+      sessions = [];
+    }
+  }
+
+  async function saveSessions(showToast=true){
+    try{
+      await window.storage.set(SESSIONS_KEY, JSON.stringify(sessions), true);
+      if(showToast) toast('Saved');
+    }catch(e){
+      toast('Could not save — please try again');
+    }
+  }
+
+  function matches(p, q){
+    q = q.toLowerCase();
+    return [p.name, p.nric, p.address, p.zone, p.contact].some(v => (v||'').toLowerCase().includes(q));
+  }
+
+  function renderAll(){
+    renderStats();
+    renderTable();
+    renderIneligibleTable();
+    renderViewerResults();
+    renderSessionsList();
+  }
+
+  // ---------- Viewer ----------
+  function renderViewerResults(){
+    const q = document.getElementById('searchInput').value.trim();
+    const container = document.getElementById('viewerResults');
+    container.innerHTML = '';
+    if(q.length < 2){
+      container.innerHTML = '<div class="empty-state"><div class="big">🔍</div>Start typing a name, NRIC, address, zone, or contact number above.</div>';
+      return;
+    }
+    const found = participants.filter(p => matches(p, q));
+    if(found.length === 0){
+      container.innerHTML = '<div class="empty-state"><div class="big">🤷</div>No matching registration found. Double-check the spelling or try a different detail.</div>';
+      return;
+    }
+    found.forEach(p => {
+      const isEligible = p.status === 'Eligible';
+      const card = document.createElement('div');
+      card.className = 'result-card' + (isEligible ? '' : ' ineligible');
+      const reasonMsg = isEligible ? '' :
+        (reasonText[p.reason] || (p.notes ? p.notes : 'Not eligible for this event.'));
+      card.innerHTML = `
+        <div class="result-top">
+          <h3 class="result-name">${escapeHtml(p.name)}</h3>
+          <span class="badge ${isEligible ? 'eligible' : 'ineligible'}">${isEligible ? '✓ Eligible' : '✕ Ineligible'}</span>
+        </div>
+        ${!isEligible ? `<p class="result-reason">${escapeHtml(reasonMsg)}</p>` : `<p class="result-reason">Registered and confirmed for the event.</p>`}
+        <div class="result-meta">
+          <div><span class="label">NRIC</span><span>${escapeHtml(p.nric)}</span></div>
+          <div><span class="label">Zone</span><span>${escapeHtml(p.zone||'—')}</span></div>
+          <div><span class="label">Contact</span><span>${escapeHtml(p.contact||'—')}</span></div>
+          <div><span class="label">Address</span><span>${escapeHtml(p.address||'—')}</span></div>
+          <div><span class="label">Mobility</span><span>${escapeHtml(mobilityLabels[p.mobility]||p.mobility||'—')}</span></div>
+        </div>
+        ${isEligible ? renderSessionBlock(p) : ''}
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  function escapeHtml(s){
+    return (s||'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  }
+
+  // ---------- Admin: stats ----------
+  function renderStats(){
+    const total = participants.length;
+    const eligible = participants.filter(p=>p.status==='Eligible').length;
+    const ineligible = total - eligible;
+    const byReason = {};
+    participants.filter(p=>p.status==='Ineligible').forEach(p=>{
+      const key = p.reason || 'Other';
+      byReason[key] = (byReason[key]||0) + 1;
+    });
+    const grid = document.getElementById('statsGrid');
+    let html = `
+      <div class="stat-card"><div class="num">${total}</div><div class="lbl">Total submissions</div></div>
+      <div class="stat-card"><div class="num">${eligible}</div><div class="lbl">Eligible</div></div>
+      <div class="stat-card danger"><div class="num">${ineligible}</div><div class="lbl">Ineligible</div></div>
+    `;
+    Object.keys(reasonLabels).forEach(key=>{
+      if(byReason[key]){
+        html += `<div class="stat-card danger"><div class="num">${byReason[key]}</div><div class="lbl">${reasonLabels[key]}</div></div>`;
+      }
+    });
+    grid.innerHTML = html;
+  }
+
+  // ---------- Admin: table ----------
+  function renderTable(){
+    const q = document.getElementById('adminSearch').value.trim();
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+    let list = participants.filter(p => p.status === 'Eligible');
+    if(q) list = list.filter(p => matches(p, q));
+
+    if(list.length === 0){
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:24px;">No eligible participants match this filter.</td></tr>';
+      return;
+    }
+
+    list.forEach(p=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${escapeHtml(p.name)}</td>
+        <td class="mono">${escapeHtml(p.nric)}</td>
+        <td>${escapeHtml(p.zone||'—')}</td>
+        <td class="mono">${escapeHtml(p.contact||'—')}</td>
+        <td>${escapeHtml(mobilityLabels[p.mobility]||p.mobility||'—')}</td>
+        <td>${p.sessionId ? escapeHtml(sessionNameById(p.sessionId)) : '<span style="color:var(--text-muted);">Unassigned</span>'}</td>
+        <td><span class="status-pill eligible">Eligible</span></td>
+        <td class="row-actions">
+          <button class="btn small secondary" data-edit="${p.id}">Edit</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('[data-edit]').forEach(btn=>{
+      btn.addEventListener('click', ()=> openEditModal(btn.getAttribute('data-edit')));
+    });
+  }
+
+  function renderIneligibleTable(){
+    const q = document.getElementById('ineligibleSearch').value.trim();
+    const reasonFilter = document.getElementById('ineligibleReasonFilter').value;
+    const tbody = document.getElementById('ineligibleTableBody');
+    tbody.innerHTML = '';
+    let list = participants.filter(p => p.status === 'Ineligible');
+    if(q) list = list.filter(p => matches(p, q));
+    if(reasonFilter) list = list.filter(p => (p.reason || 'Other') === reasonFilter);
+
+    if(list.length === 0){
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:24px;">No ineligible records match this filter.</td></tr>';
+      return;
+    }
+
+    list.forEach(p=>{
+      const tr = document.createElement('tr');
+      const reasonDisplay = reasonLabels[p.reason] || p.notes || 'Other';
+      tr.innerHTML = `
+        <td>${escapeHtml(p.name)}</td>
+        <td class="mono">${escapeHtml(p.nric)}</td>
+        <td>${escapeHtml(p.zone||'—')}</td>
+        <td class="mono">${escapeHtml(p.contact||'—')}</td>
+        <td>${escapeHtml(mobilityLabels[p.mobility]||p.mobility||'—')}</td>
+        <td><span class="status-pill ineligible">${escapeHtml(reasonDisplay)}</span></td>
+        <td class="row-actions">
+          <button class="btn small secondary" data-edit="${p.id}">Edit</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tbody.querySelectorAll('[data-edit]').forEach(btn=>{
+      btn.addEventListener('click', ()=> openEditModal(btn.getAttribute('data-edit')));
+    });
+  }
+
+  // ---------- Edit modal ----------
+  const editOverlay = document.getElementById('editOverlay');
+  const editForm = document.getElementById('editForm');
+
+  function openEditModal(id){
+    const p = id ? participants.find(x=>x.id===id) : null;
+    document.getElementById('editModalTitle').textContent = p ? 'Edit participant' : 'Add participant';
+    document.getElementById('editId').value = p ? p.id : '';
+    document.getElementById('f_name').value = p ? p.name : '';
+    document.getElementById('f_nric').value = p ? p.nric : '';
+    document.getElementById('f_address').value = p ? p.address : '';
+    document.getElementById('f_zone').value = p ? p.zone : '';
+    document.getElementById('f_contact').value = p ? p.contact : '';
+    document.getElementById('f_mobility').value = p && p.mobility ? p.mobility : 'Mobile';
+    document.getElementById('f_status').value = p ? p.status : 'Eligible';
+    document.getElementById('f_reason').value = p && p.reason ? p.reason : 'Age';
+    document.getElementById('f_notes').value = p ? p.notes : '';
+    document.getElementById('deleteEntry').style.display = p ? 'inline-block' : 'none';
+    toggleReasonField();
+    editOverlay.classList.add('active');
+  }
+  function closeEditModal(){ editOverlay.classList.remove('active'); }
+  function toggleReasonField(){
+    document.getElementById('reasonField').style.display =
+      document.getElementById('f_status').value === 'Ineligible' ? 'block' : 'none';
+  }
+
+  document.getElementById('addBtn').addEventListener('click', ()=> openEditModal(null));
+  document.getElementById('cancelEdit').addEventListener('click', closeEditModal);
+  document.getElementById('f_status').addEventListener('change', toggleReasonField);
+
+  editForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const id = document.getElementById('editId').value;
+    const status = document.getElementById('f_status').value;
+    const existing = id ? participants.find(p=>p.id===id) : null;
+    const entry = {
+      id: id || uid(),
+      name: document.getElementById('f_name').value.trim(),
+      nric: document.getElementById('f_nric').value.trim(),
+      address: document.getElementById('f_address').value.trim(),
+      zone: document.getElementById('f_zone').value.trim(),
+      contact: document.getElementById('f_contact').value.trim(),
+      mobility: document.getElementById('f_mobility').value,
+      status: status,
+      reason: status === 'Ineligible' ? document.getElementById('f_reason').value : '',
+      notes: document.getElementById('f_notes').value.trim(),
+      sessionId: existing ? (existing.sessionId || '') : ''
+    };
+    if(id){
+      participants = participants.map(p => p.id === id ? entry : p);
+    } else {
+      participants.push(entry);
+    }
+    await saveParticipants();
+    closeEditModal();
+    renderAll();
+  });
+
+  document.getElementById('deleteEntry').addEventListener('click', async ()=>{
+    const id = document.getElementById('editId').value;
+    if(!id) return;
+    if(!confirm('Delete this participant record?')) return;
+    participants = participants.filter(p=>p.id!==id);
+    await saveParticipants();
+    closeEditModal();
+    renderAll();
+  });
+
+  // ---------- Import modal ----------
+  const importOverlay = document.getElementById('importOverlay');
+  document.getElementById('importBtn').addEventListener('click', ()=> importOverlay.classList.add('active'));
+  document.getElementById('cancelImport').addEventListener('click', ()=> importOverlay.classList.remove('active'));
+
+  function parseCsv(){
+    const raw = document.getElementById('csvInput').value.trim();
+    if(!raw){ toast('Paste some CSV first'); return null; }
+    const parsed = Papa.parse(raw, {header:true, skipEmptyLines:true});
+    if(parsed.errors && parsed.errors.length){
+      toast('Could not read that CSV — check the format');
+      return null;
+    }
+    return parsed.data.map(row=>{
+      const norm = {};
+      Object.keys(row).forEach(k => norm[k.trim().toLowerCase()] = (row[k]||'').trim());
+      return {
+        id: uid(),
+        name: norm.name || '',
+        nric: norm.nric || '',
+        address: norm.address || '',
+        zone: norm.zone || '',
+        contact: norm.contact || '',
+        mobility: mobilityOptions.includes(norm.mobility) ? norm.mobility : (norm.mobility || 'Mobile'),
+        status: (norm.status || 'Eligible').toLowerCase() === 'ineligible' ? 'Ineligible' : 'Eligible',
+        reason: norm.reason || '',
+        notes: norm.notes || '',
+        sessionId: ''
+      };
+    }).filter(r => r.name);
+  }
+
+  document.getElementById('importAdd').addEventListener('click', async ()=>{
+    const rows = parseCsv();
+    if(!rows) return;
+    participants = participants.concat(rows);
+    await saveParticipants();
+    importOverlay.classList.remove('active');
+    document.getElementById('csvInput').value='';
+    renderAll();
+    toast(`Added ${rows.length} record(s)`);
+  });
+  document.getElementById('importReplace').addEventListener('click', async ()=>{
+    const rows = parseCsv();
+    if(!rows) return;
+    if(!confirm('This will replace the entire current list. Continue?')) return;
+    participants = rows;
+    await saveParticipants();
+    importOverlay.classList.remove('active');
+    document.getElementById('csvInput').value='';
+    renderAll();
+    toast(`Replaced list with ${rows.length} record(s)`);
+  });
+
+  document.getElementById('sampleBtn').addEventListener('click', async ()=>{
+    if(!confirm('Load sample data? This will replace the current list.')) return;
+    participants = sampleData();
+    await saveParticipants();
+    renderAll();
+  });
+
+  // ---------- Sessions ----------
+  function sessionNameById(id){
+    const s = sessions.find(x=>x.id===id);
+    return s ? s.name : '';
+  }
+
+  function renderSessionBlock(p){
+    if(!p.sessionId){
+      return `<div class="session-block unassigned">Not yet assigned to a session.</div>`;
+    }
+    const s = sessions.find(x=>x.id===p.sessionId);
+    if(!s){
+      return `<div class="session-block unassigned">Session no longer exists.</div>`;
+    }
+    const bits = [];
+    if(s.dateTime) bits.push(escapeHtml(s.dateTime));
+    if(s.venue) bits.push(escapeHtml(s.venue));
+    return `<div class="session-block">
+      <span class="label">Session</span>
+      <div class="session-block-name">${escapeHtml(s.name)}</div>
+      ${bits.length ? `<div class="session-block-sub">${bits.join(' · ')}</div>` : ''}
+    </div>`;
+  }
+
+  function distinctZones(){
+    const zones = new Set();
+    participants.filter(p=>p.status==='Eligible').forEach(p=>{ if(p.zone) zones.add(p.zone); });
+    return Array.from(zones).sort();
+  }
+
+  function buildCheckboxGroup(containerId, options, selected, labelFn){
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    if(options.length === 0){
+      container.innerHTML = '<span class="hint" style="margin:0;">No zones found yet — add participants first.</span>';
+      return;
+    }
+    options.forEach(opt=>{
+      const checked = selected.includes(opt);
+      const label = document.createElement('label');
+      label.className = 'checkbox-chip' + (checked ? ' checked' : '');
+      label.innerHTML = `<input type="checkbox" value="${escapeHtml(opt)}" ${checked?'checked':''}/> ${escapeHtml(labelFn ? labelFn(opt) : opt)}`;
+      label.querySelector('input').addEventListener('change', (e)=>{
+        label.classList.toggle('checked', e.target.checked);
+      });
+      container.appendChild(label);
+    });
+  }
+
+  function getCheckedValues(containerId){
+    return Array.from(document.querySelectorAll('#'+containerId+' input:checked')).map(i=>i.value);
+  }
+
+  const sessionOverlay = document.getElementById('sessionOverlay');
+  const sessionForm = document.getElementById('sessionForm');
+
+  function openSessionModal(session){
+    document.getElementById('sessionModalTitle').textContent = session ? 'Edit session' : 'New session';
+    document.getElementById('s_id').value = session ? session.id : '';
+    document.getElementById('s_name').value = session ? session.name : '';
+    document.getElementById('s_datetime').value = session ? (session.dateTime || '') : '';
+    document.getElementById('s_venue').value = session ? (session.venue || '') : '';
+    document.getElementById('s_capacity').value = session ? session.capacity : '';
+    buildCheckboxGroup('s_zones', distinctZones(), session ? session.zones : []);
+    buildCheckboxGroup('s_mobility', mobilityOptions, session ? session.mobility : [], (opt)=>mobilityLabels[opt]);
+    document.getElementById('deleteSession').style.display = session ? 'inline-block' : 'none';
+    sessionOverlay.classList.add('active');
+  }
+  function closeSessionModal(){ sessionOverlay.classList.remove('active'); }
+
+  document.getElementById('newSessionBtn').addEventListener('click', ()=> openSessionModal(null));
+  document.getElementById('cancelSession').addEventListener('click', closeSessionModal);
+
+  sessionForm.addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const id = document.getElementById('s_id').value;
+    const entry = {
+      id: id || uid(),
+      name: document.getElementById('s_name').value.trim(),
+      dateTime: document.getElementById('s_datetime').value.trim(),
+      venue: document.getElementById('s_venue').value.trim(),
+      capacity: parseInt(document.getElementById('s_capacity').value, 10) || 0,
+      zones: getCheckedValues('s_zones'),
+      mobility: getCheckedValues('s_mobility')
+    };
+    if(id){
+      sessions = sessions.map(s => s.id === id ? entry : s);
+    } else {
+      sessions.push(entry);
+    }
+    await saveSessions();
+    closeSessionModal();
+    selectedSessionId = entry.id;
+    pendingChecked = {};
+    renderSessionsList();
+  });
+
+  document.getElementById('deleteSession').addEventListener('click', async ()=>{
+    const id = document.getElementById('s_id').value;
+    if(!id) return;
+    if(!confirm('Delete this session? Participants assigned to it will become unassigned.')) return;
+    sessions = sessions.filter(s => s.id !== id);
+    participants = participants.map(p => p.sessionId === id ? {...p, sessionId:''} : p);
+    await saveSessions();
+    await saveParticipants(false);
+    closeSessionModal();
+    if(selectedSessionId === id){ selectedSessionId = null; pendingChecked = {}; }
+    renderAll();
+  });
+
+  function renderSessionsList(){
+    const container = document.getElementById('sessionsList');
+    container.innerHTML = '';
+    if(sessions.length === 0){
+      container.innerHTML = '<div class="empty-state"><div class="big">🗓️</div>No sessions yet. Create one to start assigning participants.</div>';
+      document.getElementById('sessionDetail').style.display = 'none';
+      return;
+    }
+    sessions.forEach(s=>{
+      const assignedCount = participants.filter(p=>p.sessionId===s.id).length;
+      const over = assignedCount > s.capacity;
+      const pct = Math.min(100, Math.round((assignedCount / (s.capacity||1)) * 100));
+      const criteriaBits = [];
+      if(s.dateTime) criteriaBits.push(s.dateTime);
+      if(s.venue) criteriaBits.push(s.venue);
+      if(s.zones && s.zones.length) criteriaBits.push(s.zones.join(', '));
+      if(s.mobility && s.mobility.length) criteriaBits.push(s.mobility.map(m=>mobilityLabels[m]).join(', '));
+      const card = document.createElement('div');
+      card.className = 'session-card' + (s.id === selectedSessionId ? ' selected' : '');
+      card.innerHTML = `
+        <div>
+          <div class="s-name">${escapeHtml(s.name)}</div>
+          <div class="s-sub">${criteriaBits.length ? escapeHtml(criteriaBits.join(' · ')) : 'No criteria set'}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="fill-meter"><div class="fill-meter-bar${over?' over':''}" style="width:${pct}%;"></div></div>
+          <span class="fill-label${over?' over':''}">${assignedCount}/${s.capacity}</span>
+          <button type="button" class="btn small secondary" data-editsession="${s.id}">Edit</button>
+        </div>
+      `;
+      card.addEventListener('click', (e)=>{
+        if(e.target.closest('[data-editsession]')) return;
+        if(selectedSessionId !== s.id) pendingChecked = {};
+        selectedSessionId = s.id;
+        renderSessionsList();
+      });
+      container.appendChild(card);
+    });
+    container.querySelectorAll('[data-editsession]').forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        openSessionModal(sessions.find(x=>x.id===btn.getAttribute('data-editsession')));
+      });
+    });
+    if(selectedSessionId && sessions.find(s=>s.id===selectedSessionId)){
+      renderSessionDetail(selectedSessionId);
+    } else {
+      document.getElementById('sessionDetail').style.display = 'none';
+    }
+  }
+
+  function renderSessionDetail(sessionId){
+    const s = sessions.find(x=>x.id===sessionId);
+    const detail = document.getElementById('sessionDetail');
+    if(!s){ detail.style.display = 'none'; return; }
+    detail.style.display = 'block';
+
+    if(pendingChecked.__sessionId !== sessionId){
+      pendingChecked = {__sessionId: sessionId};
+      participants.forEach(p=>{ if(p.sessionId === sessionId) pendingChecked[p.id] = true; });
+    }
+
+    const matchesCriteria = (p) =>
+      (s.zones.length === 0 || s.zones.includes(p.zone)) &&
+      (s.mobility.length === 0 || s.mobility.includes(p.mobility));
+
+    const rowsMap = new Map();
+    participants.filter(p=>p.status==='Eligible').forEach(p=>{
+      const inThisSession = p.sessionId === s.id;
+      const unassigned = !p.sessionId;
+      if((inThisSession || unassigned) && matchesCriteria(p)) rowsMap.set(p.id, p);
+    });
+    Object.keys(pendingChecked).forEach(pid=>{
+      if(pid === '__sessionId' || !pendingChecked[pid]) return;
+      const p = participants.find(x=>x.id===pid);
+      if(p) rowsMap.set(p.id, p);
+    });
+    const rows = Array.from(rowsMap.values());
+    const checkedCount = rows.filter(p=>pendingChecked[p.id]).length;
+    const over = checkedCount > s.capacity;
+
+    const criteriaBits = [];
+    if(s.dateTime) criteriaBits.push('When: ' + s.dateTime);
+    if(s.venue) criteriaBits.push('Venue: ' + s.venue);
+    if(s.zones.length) criteriaBits.push('Zones: ' + s.zones.join(', '));
+    if(s.mobility.length) criteriaBits.push('Mobility: ' + s.mobility.map(m=>mobilityLabels[m]).join(', '));
+    const criteriaText = criteriaBits.length ? criteriaBits.join(' · ') : 'No criteria set — suggesting from all eligible, unassigned participants.';
+
+    detail.innerHTML = `
+      <h2>${escapeHtml(s.name)}</h2>
+      <div class="s-criteria">${escapeHtml(criteriaText)}</div>
+      <div class="detail-stats">
+        <div class="stat-card"><div class="num">${s.capacity}</div><div class="lbl">Capacity</div></div>
+        <div class="stat-card${over ? ' danger' : ''}"><div class="num">${checkedCount}</div><div class="lbl">Selected</div></div>
+        <div class="stat-card"><div class="num">${Math.max(0, s.capacity - checkedCount)}</div><div class="lbl">Slots left</div></div>
+        <div class="stat-card"><div class="num">${rows.length}</div><div class="lbl">Candidates shown</div></div>
+      </div>
+      ${over ? `<p class="hint" style="color:var(--danger);margin-top:-8px;">Selected is over capacity by ${checkedCount - s.capacity}. You can still save, but double-check the venue can fit everyone.</p>` : ''}
+      <div class="detail-actions">
+        <button type="button" class="btn secondary" id="suggestBtn">Auto-suggest to fill slots</button>
+        <button type="button" class="btn secondary" id="clearBtn">Clear all selections</button>
+        <button type="button" class="btn primary" id="saveAssignBtn">Save assignments</button>
+      </div>
+      <div class="field"><input type="text" id="manualAddSearch" placeholder="Search any eligible participant to add manually..." /></div>
+      <div id="manualAddResults" style="margin-bottom:16px;"></div>
+      <div class="candidate-table-wrap">
+        <table>
+          <thead><tr><th></th><th>Name</th><th>NRIC</th><th>Zone</th><th>Mobility</th><th>Currently</th></tr></thead>
+          <tbody id="candidateTableBody"></tbody>
+        </table>
+      </div>
+    `;
+
+    const tbody = document.getElementById('candidateTableBody');
+    if(rows.length === 0){
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:20px;">No candidates match this criteria yet. Try widening the criteria or add someone manually below.</td></tr>';
+    } else {
+      rows.forEach(p=>{
+        const checked = !!pendingChecked[p.id];
+        const currentlyElsewhere = p.sessionId && p.sessionId !== s.id ? sessionNameById(p.sessionId) : null;
+        const tr = document.createElement('tr');
+        tr.className = 'candidate-row' + (checked ? ' checked' : '');
+        tr.innerHTML = `
+          <td><input type="checkbox" data-candidate="${p.id}" ${checked?'checked':''} /></td>
+          <td>${escapeHtml(p.name)}</td>
+          <td class="mono">${escapeHtml(p.nric)}</td>
+          <td>${escapeHtml(p.zone||'—')}</td>
+          <td>${escapeHtml(mobilityLabels[p.mobility]||p.mobility||'—')}</td>
+          <td>${currentlyElsewhere ? `<span class="tag warn">In ${escapeHtml(currentlyElsewhere)}</span>` : (p.sessionId===s.id ? '<span class="tag">In this session</span>' : '—')}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    tbody.querySelectorAll('[data-candidate]').forEach(cb=>{
+      cb.addEventListener('change', (e)=>{
+        pendingChecked[cb.getAttribute('data-candidate')] = e.target.checked;
+        renderSessionDetail(sessionId);
+      });
+    });
+
+    document.getElementById('suggestBtn').addEventListener('click', ()=>{
+      const remaining = s.capacity - rows.filter(p=>pendingChecked[p.id]).length;
+      if(remaining <= 0){ toast('Already at or over capacity'); return; }
+      let added = 0;
+      for(const p of rows){
+        if(added >= remaining) break;
+        if(!pendingChecked[p.id]){
+          pendingChecked[p.id] = true;
+          added++;
+        }
+      }
+      renderSessionDetail(sessionId);
+      toast(`Suggested ${added} more participant(s)`);
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', ()=>{
+      Object.keys(pendingChecked).forEach(k=>{ if(k !== '__sessionId') pendingChecked[k] = false; });
+      renderSessionDetail(sessionId);
+    });
+
+    document.getElementById('saveAssignBtn').addEventListener('click', async ()=>{
+      participants = participants.map(p=>{
+        if(pendingChecked[p.id]) return {...p, sessionId: s.id};
+        if(p.sessionId === s.id && !pendingChecked[p.id]) return {...p, sessionId:''};
+        return p;
+      });
+      await saveParticipants();
+      renderTable();
+      renderIneligibleTable();
+      renderSessionsList();
+      toast('Assignments saved');
+    });
+
+    document.getElementById('manualAddSearch').addEventListener('input', (e)=>{
+      const q = e.target.value.trim();
+      const resultsBox = document.getElementById('manualAddResults');
+      resultsBox.innerHTML = '';
+      if(q.length < 2) return;
+      const found = participants.filter(p=>p.status==='Eligible' && matches(p,q)).slice(0,8);
+      if(found.length === 0){
+        resultsBox.innerHTML = '<div class="hint">No eligible participants found.</div>';
+        return;
+      }
+      found.forEach(p=>{
+        const already = !!pendingChecked[p.id];
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;font-size:13.5px;';
+        row.innerHTML = `<span>${escapeHtml(p.name)} <span class="mono" style="color:var(--text-muted);">${escapeHtml(p.nric)}</span>${p.sessionId && p.sessionId!==s.id ? ` <span class="tag warn">In ${escapeHtml(sessionNameById(p.sessionId))}</span>` : ''}</span>`;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn small ' + (already ? 'secondary' : 'primary');
+        btn.textContent = already ? 'Added' : 'Add';
+        btn.disabled = already;
+        btn.addEventListener('click', ()=>{
+          pendingChecked[p.id] = true;
+          document.getElementById('manualAddSearch').value = '';
+          resultsBox.innerHTML = '';
+          renderSessionDetail(sessionId);
+        });
+        row.appendChild(btn);
+        resultsBox.appendChild(row);
+      });
+    });
+  }
+
+  // ---------- Role toggle ----------
+  function activateRole(role){
+    document.querySelectorAll('.role-btn').forEach(b=>b.classList.toggle('active', b.getAttribute('data-role')===role));
+    document.getElementById('viewerView').classList.toggle('active', role==='viewer');
+    document.getElementById('adminView').classList.toggle('active', role==='admin');
+    document.getElementById('ineligibleView').classList.toggle('active', role==='ineligible');
+    document.getElementById('sessionsView').classList.toggle('active', role==='sessions');
+  }
+  document.querySelectorAll('.role-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=> activateRole(btn.getAttribute('data-role')));
+  });
+  document.getElementById('jumpToIneligible').addEventListener('click', ()=> activateRole('ineligible'));
+
+  // ---------- Search listeners ----------
+  document.getElementById('searchInput').addEventListener('input', renderViewerResults);
+  document.getElementById('adminSearch').addEventListener('input', renderTable);
+  document.getElementById('ineligibleSearch').addEventListener('input', renderIneligibleTable);
+  document.getElementById('ineligibleReasonFilter').addEventListener('change', renderIneligibleTable);
+
+  async function init(){
+    await loadParticipants();
+    await loadSessions();
+    renderAll();
+  }
+  init();
+})();
+</script>
+</body>
+</html>
